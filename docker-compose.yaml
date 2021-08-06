@@ -1,0 +1,55 @@
+version: '3'
+
+services:
+  nodeserver:
+    entrypoint: dockerize -wait tcp://db:3306 -timeout 20s node index.js
+    build:
+      context: node
+    volumes:
+      - node:/usr/src/app
+    container_name: nodeserver
+    ports:
+      - 3000:3000
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - nodenet
+
+  nginx:
+    build:
+      context: nginx
+    restart: always
+    container_name: nginx
+    networks:
+      - nodenet
+    ports:
+      - 8080:80
+    depends_on:
+      - nodeserver
+
+  db:
+    image: mysql:5.7
+    command: --innodb-use-native-aio=0
+    container_name: db
+    restart: always
+    tty: true
+    networks:
+      - nodenet
+    ports:
+      - 3306:3306
+    volumes:
+      - mysql:/var/lib/mysql
+    environment:
+      - MYSQL_DATABASE=nodedb
+      - MYSQL_ROOT_PASSWORD=root
+    healthcheck:
+        test: mysqladmin ping -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD
+
+networks:
+  nodenet:
+    driver: bridge
+
+volumes:
+  mysql: {}
+  node: {}
